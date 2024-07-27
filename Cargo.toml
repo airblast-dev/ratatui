@@ -188,6 +188,10 @@ harness = false
 name = "list"
 harness = false
 
+[[bench]]
+name = "table"
+harness = false
+
 [lib]
 bench = false
 
