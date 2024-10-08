@@ -32,6 +32,14 @@ impl Iterator for Rows {
         self.current_row += 1;
         Some(row)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining_count = self
+            .rect
+            .height
+            .saturating_sub(self.current_row.saturating_sub(self.rect.y));
+        (remaining_count as usize, None)
+    }
 }
 
 /// An iterator over columns within a `Rect`.
@@ -65,6 +73,14 @@ impl Iterator for Columns {
         let column = Rect::new(self.current_column, self.rect.y, 1, self.rect.height);
         self.current_column += 1;
         Some(column)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self
+            .rect
+            .width
+            .saturating_sub(self.current_column.saturating_sub(self.rect.x));
+        (remaining as usize, None)
     }
 }
 
@@ -106,38 +122,83 @@ impl Iterator for Positions {
         }
         Some(position)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // Number of the remaining rows including the current row.
+        let remaining_rows = self
+            .rect
+            .height
+            .saturating_add(self.rect.y)
+            .saturating_sub(self.current_position.y);
+
+        // Number of cells remaining in the current row.
+        let remaining_cells = if remaining_rows != 0 {
+            self.rect
+                .width
+                .saturating_add(self.rect.x)
+                .saturating_sub(self.current_position.x)
+        } else {
+            return (0, None);
+        };
+
+        // Decrement the remaining rows by one since we do not want to include the
+        // current row.
+        let remaining_rows_cell_count = remaining_rows
+            .saturating_sub(1)
+            .saturating_mul(self.rect.width);
+        (
+            remaining_cells.saturating_add(remaining_rows_cell_count) as usize,
+            None,
+        )
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::*;
 
     #[test]
     fn rows() {
         let rect = Rect::new(0, 0, 2, 2);
         let mut rows = Rows::new(rect);
+        assert_eq!(rows.size_hint(), (2, None));
         assert_eq!(rows.next(), Some(Rect::new(0, 0, 2, 1)));
+        assert_eq!(rows.size_hint(), (1, None));
         assert_eq!(rows.next(), Some(Rect::new(0, 1, 2, 1)));
+        assert_eq!(rows.size_hint(), (0, None));
         assert_eq!(rows.next(), None);
+        assert_eq!(rows.size_hint(), (0, None));
     }
 
     #[test]
     fn columns() {
         let rect = Rect::new(0, 0, 2, 2);
         let mut columns = Columns::new(rect);
+        assert_eq!(columns.size_hint(), (2, None));
         assert_eq!(columns.next(), Some(Rect::new(0, 0, 1, 2)));
+        assert_eq!(columns.size_hint(), (1, None));
         assert_eq!(columns.next(), Some(Rect::new(1, 0, 1, 2)));
+        assert_eq!(columns.size_hint(), (0, None));
         assert_eq!(columns.next(), None);
+        assert_eq!(columns.size_hint(), (0, None));
     }
 
     #[test]
     fn positions() {
         let rect = Rect::new(0, 0, 2, 2);
         let mut positions = Positions::new(rect);
+        assert_eq!(positions.size_hint(), (4, None));
         assert_eq!(positions.next(), Some(Position::new(0, 0)));
+        assert_eq!(positions.size_hint(), (3, None));
         assert_eq!(positions.next(), Some(Position::new(1, 0)));
+        assert_eq!(positions.size_hint(), (2, None));
         assert_eq!(positions.next(), Some(Position::new(0, 1)));
+        assert_eq!(positions.size_hint(), (1, None));
         assert_eq!(positions.next(), Some(Position::new(1, 1)));
+        assert_eq!(positions.size_hint(), (0, None));
         assert_eq!(positions.next(), None);
+        assert_eq!(positions.size_hint(), (0, None));
     }
 }
